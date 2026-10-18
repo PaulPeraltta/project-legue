@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <rect width="120" height="120" rx="8" fill="#701b31"/>
+  <rect x="8" y="8" width="104" height="104" rx="4" fill="none" stroke="#f6f4f3" stroke-width="1" stroke-opacity="0.35"/>
+  <text x="60" y="74" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-size="48" font-weight="400" fill="#ffffff" letter-spacing="2">ML</text>
+</svg>
