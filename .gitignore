@@ -1,0 +1,14 @@
+# Dependencias y entorno
+node_modules/
+.env*
+!.env.example
+
+# Vercel
+.vercel/
+
+# Archivos de sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.vercel
