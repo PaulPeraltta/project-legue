@@ -358,11 +358,20 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     mobileLinks.forEach((link) => {
-      link.addEventListener("click", () => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const target = document.querySelector(link.getAttribute("href"));
         mobileMenu.classList.remove("open");
         menuToggle.classList.remove("open");
         menuToggle.setAttribute("aria-expanded", "false");
         mobileMenu.setAttribute("aria-hidden", "true");
+
+        if (target) {
+          window.history.pushState(null, "", link.getAttribute("href"));
+          window.setTimeout(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 360);
+        }
       });
     });
   }

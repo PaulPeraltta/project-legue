@@ -30,6 +30,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 84px;
   font-size: 14px;
 }
 
@@ -1846,6 +1847,10 @@ ol {
 }
 
 @media (max-width: 767px) {
+  html {
+    scroll-padding-top: 68px;
+  }
+
   .header-inner {
     padding: 12px 20px;
   }
@@ -1960,6 +1965,11 @@ ol {
     padding-right: 0;
   }
 
+  .about-sidebar .profile-meta-item:nth-child(1),
+  .about-sidebar .profile-meta-item:nth-child(3) {
+    display: none;
+  }
+
   .service2-area {
     padding: 75px 0 85px;
   }
@@ -2019,7 +2029,7 @@ ol {
   }
 
   .service5-area {
-    padding: 80px 0 60px;
+    padding: 80px 0 0;
   }
 
   .service5-area .section-header {
@@ -2034,14 +2044,25 @@ ol {
 
   .gallery-row {
     grid-template-columns: 1fr;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    gap: 0;
+  }
+
+  .gallery-row .img-box:not(:first-child) {
+    display: none;
   }
 
   .contact-area {
     padding: 60px 0;
   }
 
+  .contact-img-wrap {
+    display: none;
+  }
+
   .contact-grid {
-    gap: 36px;
+    gap: 0px;
   }
 
   .form-grid {
@@ -2198,6 +2219,10 @@ ol {
 
 /* --- 2. PANTALLAS FULL HD Y 2K (>= 1920px) --- */
 @media (min-width: 1920px) {
+  html {
+    scroll-padding-top: 100px;
+  }
+
   .hero-slider-wrap {
     max-width: none;
     min-height: clamp(660px, 65vh, 980px);
@@ -2384,6 +2409,10 @@ ol {
 
 /* --- 3. MONITORES 2K / 4K / ULTRAWIDE (>= 2560px) --- */
 @media (min-width: 2560px) {
+  html {
+    scroll-padding-top: 112px;
+  }
+
   .hero-slider-wrap {
     max-width: none;
     min-height: clamp(740px, 68vh, 1080px);
