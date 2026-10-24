@@ -23,5 +23,18 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.legueabogados.com.ar"
+        }
+      ],
+      "destination": "https://legueabogados.com.ar/$1",
+      "permanent": true
+    }
   ]
 }
