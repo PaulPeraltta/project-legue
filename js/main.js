@@ -1,6 +1,6 @@
 /**
  * LeGué | Estudio Jurídico - Script Principal (Vanilla JS)
- * - Slider Hero interactivo con pestañas (thumbnails) y auto-play
+ * - Slider Hero interactivo con indicadores y auto-play
  * - Animaciones suaves al hacer scroll (IntersectionObserver)
  * - Navegación sticky, menú móvil y resaltado de sección activa
  * - Validación de formulario de contacto
@@ -8,58 +8,311 @@
 
 document.addEventListener("DOMContentLoaded", () => {
   /* ========================================================================
-     1. HERO SLIDER & PESTAÑAS INTERACTIVAS
+     1. HERO SLIDER & INDICADORES INTERACTIVOS
      ======================================================================== */
-  const slides = document.querySelectorAll(".hero-slide");
-  const thumbs = document.querySelectorAll(".thumb-content");
-  const heroWrap = document.querySelector(".hero-slider-wrap");
-  let currentSlide = 0;
-  let slideInterval = null;
-  const AUTO_PLAY_MS = 6000;
+  {
+    const heroSlides = document.querySelectorAll(".hero-slide");
+    const heroDots = document.querySelectorAll(".hero-dot");
+    const heroWrap = document.querySelector(".hero-slider-wrap");
+    let currentHeroSlide = 0;
+    let heroInterval = null;
+    const HERO_AUTO_PLAY_MS = 6000;
 
-  function goToSlide(index) {
-    if (!slides.length) return;
-    currentSlide = (index + slides.length) % slides.length;
+    function goToHeroSlide(index) {
+      if (!heroSlides.length) return;
+      currentHeroSlide = (index + heroSlides.length) % heroSlides.length;
 
-    slides.forEach((slide, i) => {
-      slide.classList.toggle("active", i === currentSlide);
+      heroSlides.forEach((slide, i) => {
+        slide.classList.toggle("active", i === currentHeroSlide);
+      });
+
+      heroDots.forEach((dot, i) => {
+        const isActive = i === currentHeroSlide;
+        dot.classList.toggle("active", isActive);
+        dot.setAttribute("aria-current", isActive ? "true" : "false");
+      });
+    }
+
+    function startHeroAutoPlay() {
+      stopHeroAutoPlay();
+      heroInterval = setInterval(() => {
+        goToHeroSlide(currentHeroSlide + 1);
+      }, HERO_AUTO_PLAY_MS);
+    }
+
+    function stopHeroAutoPlay() {
+      if (heroInterval) {
+        clearInterval(heroInterval);
+        heroInterval = null;
+      }
+    }
+
+    heroDots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        const targetIndex = parseInt(dot.getAttribute("data-target"), 10);
+        if (!Number.isNaN(targetIndex)) {
+          goToHeroSlide(targetIndex);
+          startHeroAutoPlay();
+        }
+      });
     });
 
-    thumbs.forEach((thumb, i) => {
-      const isActive = i === currentSlide;
-      thumb.classList.toggle("active", isActive);
-      thumb.setAttribute("aria-selected", isActive ? "true" : "false");
-    });
-  }
-
-  function startAutoPlay() {
-    stopAutoPlay();
-    slideInterval = setInterval(() => {
-      goToSlide(currentSlide + 1);
-    }, AUTO_PLAY_MS);
-  }
-
-  function stopAutoPlay() {
-    if (slideInterval) {
-      clearInterval(slideInterval);
-      slideInterval = null;
+    if (heroWrap && heroSlides.length > 1) {
+      heroWrap.addEventListener("mouseenter", stopHeroAutoPlay);
+      heroWrap.addEventListener("mouseleave", startHeroAutoPlay);
+      startHeroAutoPlay();
     }
   }
 
-  thumbs.forEach((thumb) => {
-    thumb.addEventListener("click", () => {
-      const targetIndex = parseInt(thumb.getAttribute("data-target"), 10);
-      if (!Number.isNaN(targetIndex)) {
-        goToSlide(targetIndex);
-        startAutoPlay();
-      }
-    });
-  });
+  /* ========================================================================
+     2. CARRUSEL DE SERVICIOS (Formato 'Por qué elegirnos' con auto-play y barra de progreso)
+     ======================================================================== */
+  {
+    const servicesTrack = document.getElementById("services-carousel-track");
+    const servicesViewport = document.getElementById("services-carousel-viewport");
+    const servicesWrap = document.querySelector(".services-carousel-wrap");
+    const servicesPrev = document.getElementById("services-prev");
+    const servicesNext = document.getElementById("services-next");
+    const servicesDotsContainer = document.getElementById("services-dots");
 
-  if (heroWrap && slides.length > 1) {
-    heroWrap.addEventListener("mouseenter", stopAutoPlay);
-    heroWrap.addEventListener("mouseleave", startAutoPlay);
-    startAutoPlay();
+    if (servicesTrack && servicesViewport) {
+      const cards = Array.from(servicesTrack.querySelectorAll(".service-why-card"));
+      const totalCards = cards.length;
+      let currentServiceIndex = 0;
+      const AUTOPLAY_DELAY_MS = 5000;
+      let isPaused = false;
+      let elapsedMs = 0;
+      let lastTimestamp = null;
+      let animFrameId = null;
+
+      function getCardsPerView() {
+        if (window.innerWidth >= 992) return 3;
+        if (window.innerWidth >= 600) return 2;
+        return 1;
+      }
+
+      function getMaxServiceIndex() {
+        const perView = getCardsPerView();
+        return Math.max(0, totalCards - perView);
+      }
+
+      function updateActiveDotProgress(percent) {
+        if (!servicesDotsContainer) return;
+        const dots = servicesDotsContainer.querySelectorAll(".services-dot");
+        dots.forEach((dot, idx) => {
+          const fill = dot.querySelector(".services-dot-fill");
+          if (!fill) return;
+          if (idx === currentServiceIndex) {
+            fill.style.width = `${percent}%`;
+          } else {
+            fill.style.width = "0%";
+          }
+        });
+      }
+
+      function renderServicesDots() {
+        if (!servicesDotsContainer) return;
+        servicesDotsContainer.innerHTML = "";
+        const maxIdx = getMaxServiceIndex();
+        for (let i = 0; i <= maxIdx; i++) {
+          const dot = document.createElement("button");
+          dot.type = "button";
+          dot.className = `services-dot ${i === currentServiceIndex ? "active" : ""}`;
+          dot.setAttribute("aria-label", `Ir al servicio ${i + 1}`);
+          dot.setAttribute("aria-current", i === currentServiceIndex ? "true" : "false");
+
+          const fill = document.createElement("span");
+          fill.className = "services-dot-fill";
+          fill.style.width = i === currentServiceIndex ? `${Math.min(100, (elapsedMs / AUTOPLAY_DELAY_MS) * 100)}%` : "0%";
+          dot.appendChild(fill);
+
+          dot.addEventListener("click", () => {
+            goToServiceSlide(i);
+          });
+          servicesDotsContainer.appendChild(dot);
+        }
+      }
+
+      function updateServicesTrack() {
+        const maxIdx = getMaxServiceIndex();
+        if (currentServiceIndex > maxIdx) {
+          currentServiceIndex = maxIdx;
+        }
+        if (currentServiceIndex < 0) {
+          currentServiceIndex = 0;
+        }
+
+        if (cards.length === 0) return;
+
+        const firstCard = cards[0];
+        const secondCard = cards[1];
+        let stepWidth = firstCard.offsetWidth;
+        if (secondCard) {
+          stepWidth = secondCard.offsetLeft - firstCard.offsetLeft;
+        }
+
+        const offset = currentServiceIndex * stepWidth;
+        servicesTrack.style.transform = `translateX(-${offset}px)`;
+
+        // Actualizar estado activo en los dots
+        if (servicesDotsContainer) {
+          const dots = servicesDotsContainer.querySelectorAll(".services-dot");
+          dots.forEach((dot, idx) => {
+            const isActive = idx === currentServiceIndex;
+            dot.classList.toggle("active", isActive);
+            dot.setAttribute("aria-current", isActive ? "true" : "false");
+          });
+        }
+      }
+
+      function goToServiceSlide(index) {
+        const maxIdx = getMaxServiceIndex();
+        if (index > maxIdx) {
+          currentServiceIndex = 0;
+        } else if (index < 0) {
+          currentServiceIndex = maxIdx;
+        } else {
+          currentServiceIndex = index;
+        }
+        elapsedMs = 0;
+        updateServicesTrack();
+        updateActiveDotProgress(0);
+      }
+
+      function nextServiceSlide() {
+        const maxIdx = getMaxServiceIndex();
+        if (currentServiceIndex >= maxIdx) {
+          goToServiceSlide(0);
+        } else {
+          goToServiceSlide(currentServiceIndex + 1);
+        }
+      }
+
+      function prevServiceSlide() {
+        const maxIdx = getMaxServiceIndex();
+        if (currentServiceIndex <= 0) {
+          goToServiceSlide(maxIdx);
+        } else {
+          goToServiceSlide(currentServiceIndex - 1);
+        }
+      }
+
+      function pauseServicesAutoPlay() {
+        isPaused = true;
+        if (servicesWrap) {
+          servicesWrap.classList.add("is-paused");
+        }
+      }
+
+      function resumeServicesAutoPlay() {
+        isPaused = false;
+        lastTimestamp = performance.now();
+        if (servicesWrap) {
+          servicesWrap.classList.remove("is-paused");
+        }
+      }
+
+      function progressLoop(timestamp) {
+        if (!lastTimestamp) {
+          lastTimestamp = timestamp;
+        }
+        const delta = timestamp - lastTimestamp;
+        lastTimestamp = timestamp;
+
+        if (!isPaused && totalCards > getCardsPerView()) {
+          elapsedMs += delta;
+          const percent = Math.min(100, (elapsedMs / AUTOPLAY_DELAY_MS) * 100);
+          updateActiveDotProgress(percent);
+
+          if (elapsedMs >= AUTOPLAY_DELAY_MS) {
+            elapsedMs = 0;
+            nextServiceSlide();
+          }
+        }
+
+        animFrameId = requestAnimationFrame(progressLoop);
+      }
+
+      if (servicesNext) {
+        servicesNext.addEventListener("click", () => {
+          nextServiceSlide();
+        });
+        servicesNext.addEventListener("mouseenter", pauseServicesAutoPlay);
+        servicesNext.addEventListener("mouseleave", resumeServicesAutoPlay);
+      }
+
+      if (servicesPrev) {
+        servicesPrev.addEventListener("click", () => {
+          prevServiceSlide();
+        });
+        servicesPrev.addEventListener("mouseenter", pauseServicesAutoPlay);
+        servicesPrev.addEventListener("mouseleave", resumeServicesAutoPlay);
+      }
+
+      cards.forEach((card) => {
+        card.addEventListener("mouseenter", pauseServicesAutoPlay);
+        card.addEventListener("mouseleave", resumeServicesAutoPlay);
+      });
+
+      if (servicesWrap) {
+        servicesWrap.addEventListener("mouseenter", pauseServicesAutoPlay);
+        servicesWrap.addEventListener("mouseleave", resumeServicesAutoPlay);
+        servicesWrap.addEventListener("focusin", pauseServicesAutoPlay);
+        servicesWrap.addEventListener("focusout", resumeServicesAutoPlay);
+      }
+
+      // Detener si la pestaña no está visible para evitar saltos
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          pauseServicesAutoPlay();
+        } else {
+          resumeServicesAutoPlay();
+        }
+      });
+
+      // Soporte táctil / touch swipe en dispositivos móviles
+      let touchStartX = 0;
+      let touchEndX = 0;
+
+      servicesViewport.addEventListener(
+        "touchstart",
+        (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+          pauseServicesAutoPlay();
+        },
+        { passive: true }
+      );
+
+      servicesViewport.addEventListener(
+        "touchend",
+        (e) => {
+          touchEndX = e.changedTouches[0].screenX;
+          const diff = touchStartX - touchEndX;
+          if (Math.abs(diff) > 40) {
+            if (diff > 0) {
+              nextServiceSlide();
+            } else {
+              prevServiceSlide();
+            }
+          }
+          resumeServicesAutoPlay();
+        },
+        { passive: true }
+      );
+
+      let resizeTimer = null;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          renderServicesDots();
+          updateServicesTrack();
+        }, 100);
+      });
+
+      renderServicesDots();
+      updateServicesTrack();
+      animFrameId = requestAnimationFrame(progressLoop);
+    }
   }
 
   /* ========================================================================
@@ -244,7 +497,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Estado cargando accesible
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = "<span></span>Enviando consulta...";
+        submitBtn.innerHTML = "Enviando consulta... <span class=\"hero-button-arrow\" aria-hidden=\"true\">→</span>";
       }
       formResult.textContent = "Enviando tu consulta...";
       formResult.className = "form-result loading";
