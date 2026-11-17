@@ -61,268 +61,236 @@ document.addEventListener("DOMContentLoaded", () => {
       heroWrap.addEventListener("mouseenter", stopHeroAutoPlay);
       heroWrap.addEventListener("mouseleave", startHeroAutoPlay);
       startHeroAutoPlay();
+
+      // Deslizamiento con el dedo (solo tablet y mobile)
+      let touchStartX = 0;
+      let touchStartY = 0;
+
+      heroWrap.addEventListener(
+        "touchstart",
+        (event) => {
+          if (window.innerWidth > 1024) return;
+          touchStartX = event.touches[0].clientX;
+          touchStartY = event.touches[0].clientY;
+          stopHeroAutoPlay();
+        },
+        { passive: true }
+      );
+
+      heroWrap.addEventListener(
+        "touchend",
+        (event) => {
+          if (window.innerWidth > 1024) return;
+          const dx = event.changedTouches[0].clientX - touchStartX;
+          const dy = event.changedTouches[0].clientY - touchStartY;
+          if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            goToHeroSlide(currentHeroSlide + (dx < 0 ? 1 : -1));
+          }
+          startHeroAutoPlay();
+        },
+        { passive: true }
+      );
     }
   }
 
   /* ========================================================================
-     2. CARRUSEL DE SERVICIOS (Formato 'Por qué elegirnos' con auto-play y barra de progreso)
+     2. CARRUSEL EN SERVICIOS (Desktop, Tablet y Mobile)
      ======================================================================== */
   {
-    const servicesTrack = document.getElementById("services-carousel-track");
-    const servicesViewport = document.getElementById("services-carousel-viewport");
-    const servicesWrap = document.querySelector(".services-carousel-wrap");
-    const servicesPrev = document.getElementById("services-prev");
-    const servicesNext = document.getElementById("services-next");
-    const servicesDotsContainer = document.getElementById("services-dots");
+    const serviceBlocks = document.querySelectorAll(".services-block");
 
-    if (servicesTrack && servicesViewport) {
-      const cards = Array.from(servicesTrack.querySelectorAll(".service-why-card"));
-      const totalCards = cards.length;
-      let currentServiceIndex = 0;
-      const AUTOPLAY_DELAY_MS = 5000;
-      let isPaused = false;
-      let elapsedMs = 0;
-      let lastTimestamp = null;
-      let animFrameId = null;
+    serviceBlocks.forEach((block) => {
+      const grid = block.querySelector(".services-grid");
+      const prevBtn = block.querySelector(".prev-btn");
+      const nextBtn = block.querySelector(".next-btn");
+      const dots = Array.from(block.querySelectorAll(".services-dot"));
+      const cards = grid ? Array.from(grid.querySelectorAll(".service-why-card")) : [];
+
+      if (!grid || !cards.length) return;
+
+      const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       function getCardsPerView() {
-        if (window.innerWidth >= 992) return 3;
-        if (window.innerWidth >= 600) return 2;
+        const isBlock2 = block.classList.contains("services-block-2") || block.dataset.block === "2" || block === serviceBlocks[1];
+        if (window.innerWidth >= 1280) {
+          return isBlock2 ? 4 : 3;
+        }
+        if (window.innerWidth > 1024) return 3;
+        if (window.innerWidth >= 768) return isBlock2 ? 3 : 2;
         return 1;
       }
 
-      function getMaxServiceIndex() {
-        const perView = getCardsPerView();
-        return Math.max(0, totalCards - perView);
+      function getMaxIndex() {
+        return Math.max(0, cards.length - getCardsPerView());
       }
 
-      function updateActiveDotProgress(percent) {
-        if (!servicesDotsContainer) return;
-        const dots = servicesDotsContainer.querySelectorAll(".services-dot");
-        dots.forEach((dot, idx) => {
-          const fill = dot.querySelector(".services-dot-fill");
-          if (!fill) return;
-          if (idx === currentServiceIndex) {
-            fill.style.width = `${percent}%`;
+      function getCardScrollOffset(index) {
+        const targetCard = cards[index];
+        if (!targetCard) return 0;
+        const isMobile = window.innerWidth <= 767;
+        if (isMobile) {
+          return Math.max(0, targetCard.offsetLeft - grid.offsetLeft - 24);
+        }
+        return Math.max(0, targetCard.offsetLeft - grid.offsetLeft);
+      }
+
+      function scrollToIndex(index) {
+        const maxIdx = getMaxIndex();
+        const clampedIndex = Math.max(0, Math.min(index, maxIdx));
+        const offset = getCardScrollOffset(clampedIndex);
+
+        grid.scrollTo({
+          left: offset,
+          behavior: prefersReduced ? "auto" : "smooth"
+        });
+      }
+
+      function getCurrentIndex() {
+        const maxIdx = getMaxIndex();
+        const maxScroll = Math.max(0, grid.scrollWidth - grid.clientWidth);
+
+        if (maxScroll <= 0) return 0;
+        if (grid.scrollLeft >= maxScroll - 6) {
+          return maxIdx;
+        }
+
+        const isMobile = window.innerWidth <= 767;
+        const currentScroll = grid.scrollLeft + (isMobile ? 24 : 0);
+
+        let closestIndex = 0;
+        let minDistance = Infinity;
+
+        cards.forEach((card, index) => {
+          if (index > maxIdx) return;
+          const cardLeft = card.offsetLeft - grid.offsetLeft;
+          const distance = Math.abs(cardLeft - currentScroll);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestIndex = index;
+          }
+        });
+
+        return closestIndex;
+      }
+
+      function updateControlsState() {
+        const maxIdx = getMaxIndex();
+        const maxScroll = Math.max(0, grid.scrollWidth - grid.clientWidth);
+        const activeIndex = getCurrentIndex();
+
+        // Actualizar visibilidad y estado de los puntos de posición
+        dots.forEach((dot, index) => {
+          if (index > maxIdx) {
+            dot.style.display = "none";
           } else {
-            fill.style.width = "0%";
+            dot.style.display = "";
           }
+          const isActive = index === activeIndex;
+          dot.classList.toggle("active", isActive);
+          dot.setAttribute("aria-current", isActive ? "true" : "false");
+        });
+
+        // Actualizar botones anterior / siguiente
+        if (prevBtn) {
+          const isAtStart = grid.scrollLeft <= 4;
+          prevBtn.disabled = isAtStart;
+          prevBtn.setAttribute("aria-disabled", isAtStart ? "true" : "false");
+        }
+        if (nextBtn) {
+          const isAtEnd = grid.scrollLeft >= maxScroll - 4 || maxScroll <= 0;
+          nextBtn.disabled = isAtEnd;
+          nextBtn.setAttribute("aria-disabled", isAtEnd ? "true" : "false");
+        }
+      }
+
+      // Eventos en botones
+      if (prevBtn) {
+        prevBtn.addEventListener("click", () => {
+          const currentIdx = getCurrentIndex();
+          scrollToIndex(currentIdx - 1);
         });
       }
 
-      function renderServicesDots() {
-        if (!servicesDotsContainer) return;
-        servicesDotsContainer.innerHTML = "";
-        const maxIdx = getMaxServiceIndex();
-        for (let i = 0; i <= maxIdx; i++) {
-          const dot = document.createElement("button");
-          dot.type = "button";
-          dot.className = `services-dot ${i === currentServiceIndex ? "active" : ""}`;
-          dot.setAttribute("aria-label", `Ir al servicio ${i + 1}`);
-          dot.setAttribute("aria-current", i === currentServiceIndex ? "true" : "false");
-
-          const fill = document.createElement("span");
-          fill.className = "services-dot-fill";
-          fill.style.width = i === currentServiceIndex ? `${Math.min(100, (elapsedMs / AUTOPLAY_DELAY_MS) * 100)}%` : "0%";
-          dot.appendChild(fill);
-
-          dot.addEventListener("click", () => {
-            goToServiceSlide(i);
-          });
-          servicesDotsContainer.appendChild(dot);
-        }
-      }
-
-      function updateServicesTrack() {
-        const maxIdx = getMaxServiceIndex();
-        if (currentServiceIndex > maxIdx) {
-          currentServiceIndex = maxIdx;
-        }
-        if (currentServiceIndex < 0) {
-          currentServiceIndex = 0;
-        }
-
-        if (cards.length === 0) return;
-
-        const firstCard = cards[0];
-        const secondCard = cards[1];
-        let stepWidth = firstCard.offsetWidth;
-        if (secondCard) {
-          stepWidth = secondCard.offsetLeft - firstCard.offsetLeft;
-        }
-
-        const offset = currentServiceIndex * stepWidth;
-        servicesTrack.style.transform = `translateX(-${offset}px)`;
-
-        // Actualizar estado activo en los dots
-        if (servicesDotsContainer) {
-          const dots = servicesDotsContainer.querySelectorAll(".services-dot");
-          dots.forEach((dot, idx) => {
-            const isActive = idx === currentServiceIndex;
-            dot.classList.toggle("active", isActive);
-            dot.setAttribute("aria-current", isActive ? "true" : "false");
-          });
-        }
-      }
-
-      function goToServiceSlide(index) {
-        const maxIdx = getMaxServiceIndex();
-        if (index > maxIdx) {
-          currentServiceIndex = 0;
-        } else if (index < 0) {
-          currentServiceIndex = maxIdx;
-        } else {
-          currentServiceIndex = index;
-        }
-        elapsedMs = 0;
-        updateServicesTrack();
-        updateActiveDotProgress(0);
-      }
-
-      function nextServiceSlide() {
-        const maxIdx = getMaxServiceIndex();
-        if (currentServiceIndex >= maxIdx) {
-          goToServiceSlide(0);
-        } else {
-          goToServiceSlide(currentServiceIndex + 1);
-        }
-      }
-
-      function prevServiceSlide() {
-        const maxIdx = getMaxServiceIndex();
-        if (currentServiceIndex <= 0) {
-          goToServiceSlide(maxIdx);
-        } else {
-          goToServiceSlide(currentServiceIndex - 1);
-        }
-      }
-
-      function pauseServicesAutoPlay() {
-        isPaused = true;
-        if (servicesWrap) {
-          servicesWrap.classList.add("is-paused");
-        }
-      }
-
-      function resumeServicesAutoPlay() {
-        isPaused = false;
-        lastTimestamp = performance.now();
-        if (servicesWrap) {
-          servicesWrap.classList.remove("is-paused");
-        }
-      }
-
-      function progressLoop(timestamp) {
-        if (!lastTimestamp) {
-          lastTimestamp = timestamp;
-        }
-        const delta = timestamp - lastTimestamp;
-        lastTimestamp = timestamp;
-
-        if (!isPaused && totalCards > getCardsPerView()) {
-          elapsedMs += delta;
-          const percent = Math.min(100, (elapsedMs / AUTOPLAY_DELAY_MS) * 100);
-          updateActiveDotProgress(percent);
-
-          if (elapsedMs >= AUTOPLAY_DELAY_MS) {
-            elapsedMs = 0;
-            nextServiceSlide();
-          }
-        }
-
-        animFrameId = requestAnimationFrame(progressLoop);
-      }
-
-      if (servicesNext) {
-        servicesNext.addEventListener("click", () => {
-          nextServiceSlide();
+      if (nextBtn) {
+        nextBtn.addEventListener("click", () => {
+          const currentIdx = getCurrentIndex();
+          scrollToIndex(currentIdx + 1);
         });
-        servicesNext.addEventListener("mouseenter", pauseServicesAutoPlay);
-        servicesNext.addEventListener("mouseleave", resumeServicesAutoPlay);
       }
 
-      if (servicesPrev) {
-        servicesPrev.addEventListener("click", () => {
-          prevServiceSlide();
+      // Eventos en dots
+      dots.forEach((dot, index) => {
+        dot.addEventListener("click", () => {
+          scrollToIndex(index);
         });
-        servicesPrev.addEventListener("mouseenter", pauseServicesAutoPlay);
-        servicesPrev.addEventListener("mouseleave", resumeServicesAutoPlay);
-      }
-
-      cards.forEach((card) => {
-        card.addEventListener("mouseenter", pauseServicesAutoPlay);
-        card.addEventListener("mouseleave", resumeServicesAutoPlay);
       });
 
-      if (servicesWrap) {
-        servicesWrap.addEventListener("mouseenter", pauseServicesAutoPlay);
-        servicesWrap.addEventListener("mouseleave", resumeServicesAutoPlay);
-        servicesWrap.addEventListener("focusin", pauseServicesAutoPlay);
-        servicesWrap.addEventListener("focusout", resumeServicesAutoPlay);
-      }
-
-      // Detener si la pestaña no está visible para evitar saltos
-      document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-          pauseServicesAutoPlay();
-        } else {
-          resumeServicesAutoPlay();
-        }
-      });
-
-      // Soporte táctil / touch swipe en dispositivos móviles
-      let touchStartX = 0;
-      let touchEndX = 0;
-
-      servicesViewport.addEventListener(
-        "touchstart",
-        (e) => {
-          touchStartX = e.changedTouches[0].screenX;
-          pauseServicesAutoPlay();
+      // Sincronizar en scroll
+      let ticking = false;
+      grid.addEventListener(
+        "scroll",
+        () => {
+          if (!ticking) {
+            requestAnimationFrame(() => {
+              updateControlsState();
+              ticking = false;
+            });
+            ticking = true;
+          }
         },
         { passive: true }
       );
 
-      servicesViewport.addEventListener(
-        "touchend",
-        (e) => {
-          touchEndX = e.changedTouches[0].screenX;
-          const diff = touchStartX - touchEndX;
-          if (Math.abs(diff) > 40) {
-            if (diff > 0) {
-              nextServiceSlide();
-            } else {
-              prevServiceSlide();
-            }
+      // Sincronizar en resize de ventana
+      window.addEventListener(
+        "resize",
+        () => {
+          if (!ticking) {
+            requestAnimationFrame(() => {
+              updateControlsState();
+              ticking = false;
+            });
+            ticking = true;
           }
-          resumeServicesAutoPlay();
         },
         { passive: true }
       );
 
-      let resizeTimer = null;
-      window.addEventListener("resize", () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-          renderServicesDots();
-          updateServicesTrack();
-        }, 100);
-      });
-
-      renderServicesDots();
-      updateServicesTrack();
-      animFrameId = requestAnimationFrame(progressLoop);
-    }
+      // Inicialización
+      updateControlsState();
+    });
   }
 
   /* ========================================================================
      3. HEADER STICKY & MENÚ HAMBURGUESA MOBILE
      ======================================================================== */
   const header = document.querySelector(".site-header");
+  const heroSection = document.querySelector(".hero-section");
   const headerBrandLink = document.querySelector(".header-brand-link");
   const menuToggle = document.getElementById("menu-toggle");
   const mobileMenu = document.getElementById("mobile-menu");
   const mobileLinks = document.querySelectorAll(".mobile-nav-link");
+
+  // Lleva la ventana al inicio del contenido de la sección (después del padding),
+  // justo debajo del header, en vez de al borde superior de la sección.
+  const scrollToSection = (target) => {
+    const padTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
+    const headerH = header ? header.offsetHeight : 0;
+    const top = target.getBoundingClientRect().top + window.scrollY + padTop - headerH - 16;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  };
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!link || link.classList.contains("mobile-nav-link") || link.classList.contains("floating-contact-scroll")) return;
+    const id = link.getAttribute("href");
+    if (id.length < 2 || id === "#inicio" || id === "#main-content") return;
+    const target = document.querySelector(id);
+    if (!target) return;
+    event.preventDefault();
+    window.history.pushState(null, "", id);
+    scrollToSection(target);
+  });
 
   if (headerBrandLink) {
     headerBrandLink.addEventListener("click", (event) => {
@@ -344,6 +312,9 @@ document.addEventListener("DOMContentLoaded", () => {
     () => {
       if (header) {
         header.classList.toggle("scrolled", window.scrollY > 40);
+        // Pasado el hero, el header toma el color principal
+        const heroEnd = heroSection ? heroSection.offsetTop + heroSection.offsetHeight - header.offsetHeight : Infinity;
+        header.classList.toggle("on-primary", window.scrollY >= heroEnd);
       }
     },
     { passive: true }
@@ -369,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (target) {
           window.history.pushState(null, "", link.getAttribute("href"));
           window.setTimeout(() => {
-            target.scrollIntoView({ behavior: "smooth", block: "start" });
+            scrollToSection(target);
           }, 360);
         }
       });
@@ -614,7 +585,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const contactSection = document.getElementById("contacto");
         if (contactSection) {
           e.preventDefault();
-          contactSection.scrollIntoView({ behavior: "smooth" });
+          scrollToSection(contactSection);
           const firstInput = contactSection.querySelector("input, textarea");
           if (firstInput) {
             setTimeout(() => firstInput.focus(), 500);
